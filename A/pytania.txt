@@ -1,0 +1,6 @@
+Czy MST jest bufowane algorytmem Kruskala?
+Czy jeżeli korzeń MST ma jednego syna to podwajamy krawędź do niego?
+Czy jeżeli MST jest jedną krawędzią to ją podwajamy czy potrajamy?
+1 Co jeżeli korzeń MST ma jednego syna
+2 Co z wyszukiwaniem 10 najbliższych sąsiadów jeżeli euclid nie jest metryką przestrzeni euklidesowej
+Z jakiego wierzchołka konstruujemy cykle Eulera
