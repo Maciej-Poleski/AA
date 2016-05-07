@@ -3,7 +3,7 @@
 #ifndef DEBUG
 #define NDEBUG
 #else
-//#define _GLIBCXX_CONCEPT_CHECKS
+#define _GLIBCXX_CONCEPT_CHECKS
 #endif
 
 #include <iostream>
@@ -98,18 +98,21 @@ typedef Delaunay::Point Point;                 //punkt grafu Delaunay'a
 typedef Delaunay::Edge_iterator Edge_iterator; //iterator po krawedziach grafu Delaunaya
 typedef Delaunay::Vertex_handle Vertex_handle; //iterator po punktach grafu Delaunaya
 
-//static double dist(int v, int w)
-//{
-//    double x = input[v].x() - input[w].x();
-//    double y = input[v].y() - input[w].y();
-//    return hypot(x, y);
-//}
+static int n;
+static vector<Point> input;
+
+static double dist(int v, int w)
+{
+    double x = input[v].x() - input[w].x();
+    double y = input[v].y() - input[w].y();
+    return hypot(x, y);
+}
 
 //#if 0
-//static int euclid(int v, int w)
-//{
-//    return static_cast<int>(dist(v, w) + 0.5);
-//}
+static int euclid(int v, int w)
+{
+    return static_cast<int>(dist(v, w) + 0.5);
+}
 //#endif
 
 static int euclid(Point A, Point B)
@@ -210,10 +213,10 @@ class PlaneHierarchy
 {
     class PlaneCell
     {
-        vector<Point> points;
+        vector<int> points;
         Point representant;
     public:
-        void addPoint(Point p)
+        void addPoint(int p)
         {
             points.push_back(p);
         }
@@ -228,7 +231,7 @@ class PlaneHierarchy
             return representant;
         }
 
-        const vector<Point> &getPoints() const
+        const vector<int> &getPoints() const
         {
             return points;
         }
@@ -245,7 +248,7 @@ class PlaneHierarchy
     struct CellRelative
     {
         int distance = -1;
-        int from, to;
+        int from, to;   // Identyfikator globalny (nie points-iterator)
     };
 
     vector<PlaneCell> cells;
@@ -253,9 +256,11 @@ class PlaneHierarchy
     int k;
 
 public:
-    PlaneHierarchy(const std::vector<Point> &input, int k);
+    PlaneHierarchy(int k);
 
     list <metaCoords_t> chooseMetaCycle();
+
+    list<int> choosePathForChunk(metaCoords_t before, metaCoords_t chunk, metaCoords_t after);
 
 private:
     int encode(int x, int y) const
@@ -263,7 +268,7 @@ private:
         assert(x >= 0);
         assert(y >= 0);
         assert(x * k + y < k * k);
-        return x * k + y;
+        return y * k + x;
     }
 
     int encode(metaCoords_t P) const
@@ -287,10 +292,10 @@ private:
     int euclid(metaCoords_t A, metaCoords_t B);
 
     int encodeMeta(metaCoords_t A, metaCoords_t B) const
-    { return encode(A) * k * k + encode(B); }
+    { return encode(B) * k * k + encode(A); }
 };
 
-PlaneHierarchy::PlaneHierarchy(const std::vector<Point> &input, int k) : cells(k * k), distances(k * k * k * k), k(k)
+PlaneHierarchy::PlaneHierarchy(int k) : cells(k * k), distances(k * k * k * k), k(k)
 {
     double maxX = max_element(input.begin(), input.end(), [](const Point &lhs, const Point &rhs) {
         return lhs.x() < rhs.x();
@@ -300,10 +305,10 @@ PlaneHierarchy::PlaneHierarchy(const std::vector<Point> &input, int k) : cells(k
     })->y();
     double width = maxX / k;
     double height = maxY / k;
-    for (auto p : input) {
-        int x = static_cast<int>(p.x() / width);
-        int y = static_cast<int>(p.y() / height);
-        getCellChecked(x, y).addPoint(p);
+    for (int i = 0; i < input.size(); ++i) {
+        int x = static_cast<int>(input[i].x() / width);
+        int y = static_cast<int>(input[i].y() / height);
+        getCellChecked(x, y).addPoint(i);
     }
     for (auto &c : cells) {
         c.construct();
@@ -335,8 +340,8 @@ void PlaneHierarchy::PlaneCell::chooseRepresentantPoint()
     }
     double x = 0, y = 0;
     for (auto p : points) {
-        x += p.x();
-        y += p.y();
+        x += input[p].x();
+        y += input[p].y();
     }
     representant = {x / n, y / n};
 }
@@ -383,6 +388,7 @@ int PlaneHierarchy::euclid(metaCoords_t A, metaCoords_t B)
         assert(found);
 #endif // DEBUG
 #endif // 0
+#if 0 // kolejna badziewna heureza
         // oblicza odległość między otoczkami wypukłymi heurystycznie (błędnie)
         // osobiśnie nie podoba mi się ten algorytm
         vector<int> hullA, hullB;
@@ -413,7 +419,7 @@ int PlaneHierarchy::euclid(metaCoords_t A, metaCoords_t B)
         int bIncrement = 1; // w którą stronę iterować B
         if (pointsB.size() > 1 && (euclid(pointsA[hullA[aPtr]], pointsB[hullB.back()]) < dist)) {
             bIncrement = -1;
-        }
+        } // mogą się źle poskładać ...
         for (; ;) {
             // przesuń A
             bool improved = false;
@@ -445,6 +451,54 @@ int PlaneHierarchy::euclid(metaCoords_t A, metaCoords_t B)
         distances[distOffset2].distance = dist;
         distances[distOffset2].to = hullA[aPtr];
         distances[distOffset2].from = hullB[bPtr];
+#endif // 0
+        // Oblicza graf delone obydwu zbioru punktów i wybiera najkrótszą krawędź o końcach z różnych zbiorów
+        // to jest rozwiązanie dokładne
+        const auto &pointsA = getCell(A).getPoints(), &pointsB = getCell(B).getPoints();
+        Delaunay D;
+        vector<pair<Point, int>> delonePoints;
+        unordered_map<int, char> color;
+        for (int i = 0; i < pointsA.size(); ++i) {
+            delonePoints.push_back(make_pair(input[pointsA[i]], pointsA[i]));
+            color[pointsA[i]] = 'A';
+        }
+        for (int i = 0; i < pointsB.size(); ++i) {
+            delonePoints.push_back(make_pair(input[pointsB[i]], pointsB[i]));
+            color[pointsB[i]] = 'B';
+        }
+        D.insert(delonePoints.begin(), delonePoints.end());
+        int lowestDist = numeric_limits<int>::max();
+        int pointX, pointY; // na razie nie wiadomo który to A, B
+        for (auto i = D.finite_edges_begin(), e = D.finite_edges_end(); i != e; ++i) {
+            auto &face = i->first;
+            auto param = i->second;
+            int v1 = face->vertex(face->cw(param))->info();
+            int v2 = face->vertex(face->ccw(param))->info();
+            if (color[v1] == color[v2]) {
+                continue;
+            }
+            using ::euclid;
+            if (euclid(v1, v2) < lowestDist) {
+                lowestDist = euclid(v1, v2);
+                pointX = v1;
+                pointY = v2;
+            }
+        }
+        assert(lowestDist != numeric_limits<int>::max());
+        assert(color[pointX] != color[pointY]);
+        if (color[pointX] == 'B') {
+            using std::swap;
+            swap(pointX, pointY);
+        }
+        assert(color[pointX] == 'A');
+        assert(color[pointY] == 'B');
+        distances[distOffset].distance = lowestDist;
+        distances[distOffset].from = pointX;
+        distances[distOffset].to = pointY;
+        auto distOffset2 = encodeMeta(B, A);
+        distances[distOffset2].distance = lowestDist;
+        distances[distOffset2].to = pointX;
+        distances[distOffset2].from = pointY;
     }
     return distances[distOffset].distance;
 }
@@ -516,6 +570,68 @@ list <metaCoords_t> PlaneHierarchy::chooseMetaCycle()
     return result;
 }
 
+list<int> PlaneHierarchy::choosePathForChunk(metaCoords_t before, metaCoords_t chunk, metaCoords_t after)
+{
+    euclid(chunk, before); // potrzebny efekt uboczny - wskazanie wierzchołków "przejściowych"
+    euclid(chunk, after);
+    assert(distances[encodeMeta(chunk, before)].distance != -1);
+    assert(distances[encodeMeta(chunk, after)].distance != -1);
+    int begin = distances[encodeMeta(chunk, before)].from;
+    int end = distances[encodeMeta(chunk, after)].from;
+    list<int> result = {begin, end};
+    if (begin == end) {
+        result.pop_back();
+    }
+    list<int> remainingVertices;
+    const vector<int> &pointsIndices = getCell(chunk).getPoints();
+    for (int p : pointsIndices) {
+        if ((p != begin) && (p != end)) {
+            remainingVertices.push_back(p);
+        }
+    }
+    assert(remainingVertices.size() == pointsIndices.size() - result.size());
+    while (result.size() != pointsIndices.size()) {
+        using ::euclid;
+        // wybierz najdalszy od result
+        auto nextVertexIdx = remainingVertices.begin();
+        int maxDistFromResultSet = -1;
+        for (auto candidate = remainingVertices.begin(), e = remainingVertices.end(); candidate != e; ++candidate) {
+            int minDistToResultSet = numeric_limits<int>::max();
+            for (int resultPoint : result) {
+                int newDist = euclid(resultPoint, *candidate);
+                if (newDist < minDistToResultSet) {
+                    minDistToResultSet = newDist;
+                }
+            }
+            if (minDistToResultSet > maxDistFromResultSet) {
+                maxDistFromResultSet = minDistToResultSet;
+                nextVertexIdx = candidate;
+            }
+        }
+        int vertex = *nextVertexIdx;
+        remainingVertices.erase(nextVertexIdx);
+        // wstaw vertex w najlepsze miejsce
+        auto position = result.cbegin();
+        int price =
+                euclid(result.back(), vertex) + euclid(vertex, result.front()) - euclid(result.back(), result.front());
+        for (auto j = result.cbegin(), i = j++; j != result.cend(); ++j, ++i) {
+            int newPrice = euclid(*i, vertex) + euclid(vertex, *j) - euclid(*i, *j);
+            if (newPrice < price) {
+                price = newPrice;
+                position = j;
+            }
+        }
+        result.insert(position, vertex);
+    }
+    return result;
+}
+
+template<typename DContainer, typename SContainer>
+void copy(DContainer &dest, const SContainer &source)
+{
+    copy(source.begin(), source.end(), back_inserter(dest));
+};
+
 int main()
 {
     close(0);
@@ -524,8 +640,6 @@ int main()
     int z;
     cin >> z;
     while (z--) {
-        int n;
-        vector<Point> input;
         cin >> n;
         input.resize(n);
         for (auto &p:input) {
@@ -541,7 +655,26 @@ int main()
             p = {p.x() - minX, p.y() - minY};
         }
         int k = static_cast<int>(sqrt(sqrt(n)));
-        PlaneHierarchy plane(input, k);
+        if (k == 1) {
+            k = 2; // patrz fixme poniżej
+            // teraz powinny istnieć przynajmniej 2 meta wierzchołki (bo n>=2)
+        }
+        PlaneHierarchy plane(k);
         auto metaCycle = plane.chooseMetaCycle();
+        assert(metaCycle.size() > 1);   // patrz fixme
+        vector<int> result;
+        result.reserve(n);
+        copy(result, plane.choosePathForChunk(metaCycle.back(), metaCycle.front(), *++metaCycle.begin()));
+        for (auto R = metaCycle.begin(), L = R++, C = R++, e = metaCycle.end(); R != e; ++L, ++C, ++R) {
+            // fragment cyklu .. - L - C - R - ..
+            // FIXME Jeżeli k==1 to potrzebujemy _cyklu_ a nie ścieżki w komórce - potrzebna jest inna implementacja
+            copy(result, plane.choosePathForChunk(*L, *C, *R));
+        }
+        copy(result, plane.choosePathForChunk(*++metaCycle.rbegin(), metaCycle.back(), metaCycle.front()));
+
+        for (int v : result) {
+            cout << v << ' ';
+        }
+        cout << '\n' << getHamiltonianLength(result.begin(), result.end()) << '\n';
     }
 }
