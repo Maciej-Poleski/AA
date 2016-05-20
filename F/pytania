@@ -1,0 +1,4 @@
+Czy poprawiając meta ścieżke sprawdzamy tylko krawędzie od aktywnej komórki do jej sąsiadów czy do wszystkich komórek?
+Czy wykonywanie "dopóki taki ruch można wykonać" oznacza wykonywanie dowolnej ilości podruchów aż do momentu gdy następny podruch pogorszy cykl? (czy ścieżke?) czy sekwencja podruchów składa się z 15 2-opt/node-insertion po których wybieramy kolejny wierzchołek aktywny i zaczynamy od nowa aż do momentu gdy sekwencja przestanie poprawiać? (lub przetestowaliśmy wszystkie wierzchołki jako aktywne i żaden nie dawał poprawiającego ruchu?)
+Czy poprawianie ścieżek w komórkach powinno wykorzystywać dedykowane grafy kandydatów czy wspólny graf kandydatów ignorując kandydatów z poza danej komórki?
+"Ze względu na ograniczenia czasowe, każdy punkt testowany jest tylko dwa razy jako kandydat dla ruchu 2-opt lub node-insertion" chodzi o to że dany wierzchołek jest dokładnie dwa razy aktywny w sensie definicji użytych w zadaniu D?
