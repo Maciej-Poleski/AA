@@ -22,6 +22,7 @@
 #include <list>
 #include <utility>
 #include <memory>
+#include <tuple>
 
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Triangulation_vertex_base_with_info_2.h>
@@ -100,7 +101,7 @@ public:
 
     Integer after(Integer vertex);
 
-    vector <Integer> dumpOrderly() const;
+    vector<Integer> dumpOrderly() const;
 
     void moveToEnd(Integer vertex);
 
@@ -119,7 +120,7 @@ public:
     }
 
 private:
-    vector <Node> chunk;
+    vector<Node> chunk;
     Integer root;
 
     void dispatchReversal(Integer vertex);
@@ -225,9 +226,9 @@ private:
 
 // Ustawia left, right, reversed. Nie ustawia parent
 template<typename Iterator>
-static typename iterator_traits<Iterator>::value_type buildStructure(
-        vector<typename SplayTree<typename iterator_traits<Iterator>::value_type>::Node> &chunk, Iterator begin,
-        Iterator end)
+static typename iterator_traits<Iterator>::value_type
+buildStructure(vector<typename SplayTree<typename iterator_traits<Iterator>::value_type>::Node> &chunk, Iterator begin,
+               Iterator end)
 {
     // Iterator powinien być RandomAccessIterator, w przeciwnym wypadku - gorsza złożoność
     typedef typename iterator_traits<Iterator>::value_type Integer;
@@ -292,8 +293,8 @@ Integer SplayTree<Integer>::after(Integer vertex)
 }
 
 template<typename Integer>
-static void dumpSplayChunk(const vector<typename SplayTree<Integer>::Node> &chunk, Integer v, bool reverse,
-                           vector <Integer> &order)
+static void
+dumpSplayChunk(const vector<typename SplayTree<Integer>::Node> &chunk, Integer v, bool reverse, vector<Integer> &order)
 {
     if (v == SplayTree<Integer>::null) {
         return;
@@ -311,9 +312,9 @@ static void dumpSplayChunk(const vector<typename SplayTree<Integer>::Node> &chun
 }
 
 template<typename Integer>
-vector <Integer> SplayTree<Integer>::dumpOrderly() const
+vector<Integer> SplayTree<Integer>::dumpOrderly() const
 {
-    vector <Integer> result;
+    vector<Integer> result;
     dumpSplayChunk(chunk, root, false, result);
     return result;
 }
@@ -618,9 +619,9 @@ typedef Delaunay::Edge_iterator Edge_iterator; //iterator po krawedziach grafu D
 typedef Delaunay::Vertex_handle Vertex_handle; //iterator po punktach grafu Delaunaya
 
 static int n;
-static vector <Point> input;
-static vector <vector<int>> G;   // graf kandydatów
-static vector <vector<int>> Gcells; // wszystkie grafy kandydatów komórek
+static vector<Point> input;
+static vector<vector<int>> G;   // graf kandydatów
+static vector<vector<int>> Gcells; // wszystkie grafy kandydatów komórek
 
 static double dist(int v, int w)
 {
@@ -649,13 +650,13 @@ static void buildG()
     const int nbNeighbors = 10;
     G.resize(n);
     Delaunay D;
-    vector <pair<Point, int>> delonePoints;
+    vector<pair<Point, int>> delonePoints;
     assert(input.size() == n);
     for (int i = 0; i < n; ++i) {
         delonePoints.push_back(make_pair(input[i], i));
     }
     D.insert(delonePoints.begin(), delonePoints.end());
-    vector <unordered_set<int>> Gproto(n);
+    vector<unordered_set<int>> Gproto(n);
     for (auto i = D.finite_vertices_begin(), e = D.finite_vertices_end(); i != e; ++i) {
         vector<int> neighbors;
         auto vc = i->incident_vertices();
@@ -665,7 +666,7 @@ static void buildG()
                 neighbors.push_back(v.info());
             }
         }
-        vector <Vertex_handle> near;
+        vector<Vertex_handle> near;
         D.nearest_neighbors(i, 1 + nbNeighbors, back_inserter(near));
         assert(near.size() >= min(nbNeighbors, n - 1));
         for (auto &v : near) {
@@ -692,12 +693,13 @@ static void buildG()
 
 namespace std {
     template<>
-    struct hash<pair < int, int>> {
-    size_t operator()(const pair<int, int> &p) const noexcept
+    struct hash<pair<int, int>>
     {
-        return size_t(p.first) << 32 | size_t(p.second);
-    }
-};
+        size_t operator()(const pair<int, int> &p) const noexcept
+        {
+            return size_t(p.first) << 32 | size_t(p.second);
+        }
+    };
 }
 
 namespace std {
@@ -733,7 +735,8 @@ void copy(DContainer &dest, const SContainer &source)
     copy(source.begin(), source.end(), back_inserter(dest));
 };
 
-static pair<double, vector<int16_t>> compute1TreeOnCandidates(const vector<double> &P, vector <pair<uint16_t, uint16_t>> &edges)
+static pair<double, vector<int16_t>>
+compute1TreeOnCandidates(const vector<double> &P, vector<pair<uint16_t, uint16_t>> &edges)
 {
     sort(edges.begin(), edges.end(), [&P](pair<uint16_t, uint16_t> lhs, pair<uint16_t, uint16_t> rhs) {
         return euclid(lhs.first, lhs.second) + P[lhs.first] + P[lhs.second] <
@@ -792,7 +795,7 @@ static pair<double, vector<int16_t>> compute1TreeOnCandidates(const vector<doubl
 
 static pair<double, vector<int16_t>> compute1TreeOnEuclidean(const vector<double> &P)
 {
-    vector <pair<uint16_t, uint16_t>> edges;
+    vector<pair<uint16_t, uint16_t>> edges;
     edges.reserve(n * (n - 1) / 2);
     for (int u = 0; u < n; ++u) {
         for (int v = u + 1; v < n; ++v) {
@@ -854,10 +857,140 @@ static pair<double, vector<int16_t>> compute1TreeOnEuclidean(const vector<double
     return {weight, move(newD)};
 }
 
+static pair<vector<uint16_t>,long> buildHamiltonianFromMst(vector<list < uint16_t>> &&MST)
+{
+    list <uint16_t> verticesWithDegree1or0;
+    for (int u = 0; u < n; ++u) {
+        if (MST[u].size() == 1) {
+            verticesWithDegree1or0.push_back(u);
+        }
+    }
+    vector<uint16_t> result;
+    vector<bool> removed(n, false);
+    long resultLength = 0;
+    result.reserve(n);
+    while (!verticesWithDegree1or0.empty()) {
+        auto u = verticesWithDegree1or0.back();
+        verticesWithDegree1or0.pop_back();
+        if (removed[u]) {
+            continue;
+        }
+        removed[u] = true;
+        result.push_back(u);
+        if (verticesWithDegree1or0.empty()) {
+            break;
+        }
+        // walk and extract
+        auto bestPosition = MST[u].end();
+        int bestPositionDistance = numeric_limits<int>::max();
+        for (auto i = MST[u].begin(), e = MST[u].end(); i != e; ++i) {
+            if (bestPositionDistance > euclid(u, *i)) {
+                bestPositionDistance = euclid(u, *i);
+                bestPosition = i;
+            }
+        }
+        uint16_t v;
+        if (bestPosition != MST[u].end()) {
+            v = *bestPosition;
+            resultLength += bestPositionDistance;
+        } else {
+            // znajdź nowy początek
+            assert(!verticesWithDegree1or0.empty());
+            auto bestPosition = verticesWithDegree1or0.end();
+            int bestPositionDistance = numeric_limits<int>::max();
+            for (auto i = verticesWithDegree1or0.begin(), e = verticesWithDegree1or0.end(); i != e; ++i) {
+                if (removed[*i]) {
+                    continue; // TODO można przyspieszyć
+                }
+                if (bestPositionDistance > euclid(u, *i)) {
+                    bestPositionDistance = euclid(u, *i);
+                    bestPosition = i;
+                }
+            }
+            //assert(bestPosition != verticesWithDegree1or0.end());
+            if(bestPosition == verticesWithDegree1or0.end()) {
+                break;
+            }
+            v = *bestPosition;
+            verticesWithDegree1or0.erase(bestPosition);
+            resultLength += bestPositionDistance;
+        }
+        for (auto x : MST[u]) {
+            MST[x].erase(find(MST[x].begin(), MST[x].end(), u));
+            if(MST[x].size() == 1) {
+                verticesWithDegree1or0.push_back(x);
+            }
+        }
+        MST[u].clear();
+        verticesWithDegree1or0.push_back(v); // wybrany liść lub wierzchołek wewnętrzny
+    }
+    resultLength += euclid(result[0], result.back());
+    return {move(result), resultLength};
+}
+
+static tuple<double, vector<int16_t>, pair<vector<uint16_t>,long>>
+compute1TreeAndSolutionOnCandidates(const vector<double> &P, vector<pair<uint16_t, uint16_t>> &edges)
+{
+    sort(edges.begin(), edges.end(), [&P](pair<uint16_t, uint16_t> lhs, pair<uint16_t, uint16_t> rhs) {
+        return euclid(lhs.first, lhs.second) + P[lhs.first] + P[lhs.second] <
+               euclid(rhs.first, rhs.second) + P[rhs.first] + P[rhs.second];
+    });
+    vector<list < uint16_t>> MST(n);
+    double weight = 0;
+    FindUnion findUnion(n);
+    auto components = n;
+    for (auto e : edges) {
+        auto u = e.first;
+        auto v = e.second;
+        if (findUnion.tryUnion(u, v)) {
+            components -= 1;
+            MST[u].push_back(v);
+            MST[v].push_back(u);
+            weight += euclid(u, v) + P[u] + P[v];
+            if (components == 1) {
+                break;
+            }
+        }
+    }
+    vector<int16_t> newD(n);
+    for (int i = 0; i < n; ++i) {
+        newD[i] = static_cast<int16_t>(MST[i].size()) - 2;
+    }
+    pair<int, int> oneEdge;
+    double oneEdgeWeight = -1;
+    for (int u = 0; u < n; ++u) {
+        if (newD[u] != -1) {
+            continue;
+        }
+        int currentV;
+        double currentWeight = numeric_limits<double>::max();
+        for (auto v : G[u]) {
+            if (v == MST[u].front()) {
+                continue;
+            }
+            auto weight = euclid(u, v) + P[u] + P[v];
+            if (weight < currentWeight) {
+                currentV = v;
+                currentWeight = weight;
+            }
+        }
+        assert(currentWeight != numeric_limits<double>::max());
+        if (oneEdgeWeight < currentWeight) {
+            oneEdgeWeight = currentWeight;
+            oneEdge = {u, currentV};
+        }
+    }
+    assert(oneEdgeWeight > 0);
+    newD[oneEdge.first] += 1;
+    newD[oneEdge.second] += 1;
+    weight += oneEdgeWeight;
+    return make_tuple(weight, move(newD), buildHamiltonianFromMst(move(MST)));
+};
+
 int main()
 {
     //close(0);
-    //open("/home/local/AA/G1/testy/55.in", O_RDONLY);
+    //open("/home/local/AA/G2/testy/55.in", O_RDONLY);
     ios_base::sync_with_stdio(false);
     int z;
     cin >> z;
@@ -872,7 +1005,7 @@ int main()
         for (int v = 1; v < n; ++v) {
             upperBound += euclid(v - 1, v);
         }
-        vector <pair<uint16_t, uint16_t>> edges;
+        vector<pair<uint16_t, uint16_t>> edges;
         for (uint16_t u = 0; u < n; ++u) {
             for (uint16_t v : G[u]) {
                 if (u < v) {
@@ -886,9 +1019,9 @@ int main()
         double bestPValue = 0;
         vector<int16_t> oldD(n);
         double step = -1;
-        for (int iteration = 0; iteration < 500; ++iteration) {
+        for (int iteration = 0; iteration < 350; ++iteration) {
             auto oneTree = compute1TreeOnCandidates(P, edges);
-            if (iteration > 350 && oneTree.first > bestPValue) {
+            if (oneTree.first > bestPValue) {
                 bestPValue = oneTree.first;
                 bestP = P;
             }
@@ -905,7 +1038,31 @@ int main()
             }
             oldD = move(oneTree.second);
         }
+        pair<vector<uint16_t>,long> bestHamiltonian = {{},numeric_limits<long>::max()};
+        for (int iteration = 350; iteration < 500; ++iteration) {
+            auto oneTreeAndSolution = compute1TreeAndSolutionOnCandidates(P, edges);
+            if (get<0>(oneTreeAndSolution) > bestPValue) {
+                bestPValue = get<0>(oneTreeAndSolution);
+                bestP = P;
+            }
+            step = step * lambda;
+            for (int i = 0; i < n; ++i) {
+                P[i] += step * (0.7 * get<1>(oneTreeAndSolution)[i] + 0.3 * oldD[i]);
+            }
+            oldD = move(get<1>(oneTreeAndSolution));
+            if(get<2>(oneTreeAndSolution).second<bestHamiltonian.second) {
+#ifdef DEBUG
+                assert(get<2>(oneTreeAndSolution).second == getHamiltonianLength(get<2>(oneTreeAndSolution).first.begin(), get<2>(oneTreeAndSolution).first.end()));
+#endif
+                bestHamiltonian = move(get<2>(oneTreeAndSolution));
+            }
+        }
         auto realOneTree = compute1TreeOnEuclidean(bestP);
         cout << static_cast<long>(realOneTree.first - 2 * accumulate(bestP.begin(), bestP.end(), .0) + .5) << '\n';
+        for(auto v : bestHamiltonian.first) {
+            cout << v << ' ';
+        }
+        cout << '\n' << bestHamiltonian.second << '\n';
     }
+    return 0;
 }
